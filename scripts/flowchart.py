@@ -62,6 +62,10 @@ PROCESS_H = 44
 SUB_W = 180               # 分支子节点宽（type_data 等）
 SUB_H = 44
 
+# y 布局单位（按主干路深度累加）
+UNIT_H = 76.0             # 一个主干层级的高度（节点高 44 + 间距 32）
+HALF_UNIT_H = 38.0        # 有 label 文本时额外加的高度
+
 
 # ---------------------------------------------------------------------------
 # 数据结构
@@ -319,24 +323,39 @@ def _assign_depth(graph: Graph) -> None:
 # ---------------------------------------------------------------------------
 
 def _assign_y(graph: Graph) -> None:
-    """按 level 分配 y。每层 y = 上一层最大底部 + 间距（非等距，因为节点高度不同）。"""
+    """按主干路深度分配 y。
+
+    规则：
+    - 每个主干层级 +1 UNIT_H
+    - 如果相邻层级之间的边有 label 文本 → 额外 +0.5 UNIT_H
+    - 侧支节点（与决策同 level）y = 决策 y
+    """
     from collections import defaultdict
     by_level: dict[int, list[Node]] = defaultdict(list)
     for n in graph.nodes.values():
         by_level[n.level].append(n)
 
-    LEVEL_GAP = 26.0  # 层间间距
+    # 建立边索引：from_level → 是否有 label
+    edges_by_from_level: dict[int, list[bool]] = defaultdict(list)
+    for e in graph.edges:
+        if e.from_id in graph.nodes and e.to_id in graph.nodes:
+            src_lvl = graph.nodes[e.from_id].level
+            edges_by_from_level[src_lvl].append(bool(e.label))
+
     sorted_levels = sorted(by_level.keys())
+    level_y: dict[int, float] = {}
     for i, lvl in enumerate(sorted_levels):
-        nodes = by_level[lvl]
-        max_h = max(n.height for n in nodes)
         if i == 0:
-            cy = TOP_PAD  # 第一层直接用 TOP_PAD 作为中心
+            level_y[lvl] = TOP_PAD
         else:
-            cy = prev_bottom + LEVEL_GAP + max_h / 2
-        for n in nodes:
-            n.cy = cy
-        prev_bottom = cy + max_h / 2
+            prev_lvl = sorted_levels[i - 1]
+            # 检查 prev_lvl → lvl 之间是否有 label 边
+            has_label = any(edges_by_from_level.get(prev_lvl, []))
+            gap = UNIT_H + (HALF_UNIT_H if has_label else 0.0)
+            level_y[lvl] = level_y[prev_lvl] + gap
+    for lvl, y in level_y.items():
+        for n in by_level[lvl]:
+            n.cy = y
 
 
 # ---------------------------------------------------------------------------
@@ -441,7 +460,13 @@ def _render_node(n: Node) -> str:
 
 
 def _edge_geometry(graph: Graph, e: Edge) -> dict[str, Any]:
-    """返回一条边的几何信息：起点、终点、是否水平/斜线/垂直、label 位置。"""
+    """返回一条边的几何信息。
+
+    三种类型：
+    - horizontal: 决策侧支，水平连线
+    - vertical: 主流程向下，垂直连线
+    - fork: 普通分叉，垂直→水平→垂直 折线（不画斜线）
+    """
     src = graph.nodes[e.from_id]
     dst = graph.nodes[e.to_id]
 
@@ -452,7 +477,6 @@ def _edge_geometry(graph: Graph, e: Edge) -> dict[str, Any]:
         else:
             sx = src.cx + DIAMOND_HALF_W
         sy = src.cy
-        # 终点：dst 的对应侧边缘
         if e.side == "left":
             ex = dst.cx + dst.width / 2
         else:
@@ -462,16 +486,16 @@ def _edge_geometry(graph: Graph, e: Edge) -> dict[str, Any]:
         ly = sy - 8
         return {"type": "horizontal", "x1": sx, "y1": sy, "x2": ex, "y2": ey, "lx": lx, "ly": ly}
 
-    # 普通分叉（phase0→type_data/method）：斜线
-    # 判定：src 不是决策，side=left/right
+    # 普通分叉（src 不是决策，side=left/right）：折线，不画斜线
     if src.type != "decision" and e.side in ("left", "right"):
-        sx = src.cx + (src.width / 2 if e.side == "right" else -src.width / 2)
+        sx = src.cx
         sy = src.cy + src.height / 2
-        ex = dst.cx + (dst.width / 2 if e.side == "left" else -dst.width / 2)
+        ex = dst.cx
         ey = dst.cy - dst.height / 2
+        # label 放在水平段中点上方
         lx = (sx + ex) / 2
         ly = (sy + ey) / 2 - 6
-        return {"type": "diagonal", "x1": sx, "y1": sy, "x2": ex, "y2": ey, "lx": lx, "ly": ly}
+        return {"type": "fork", "x1": sx, "y1": sy, "x2": ex, "y2": ey, "lx": lx, "ly": ly}
 
     # 默认：垂直连线（主流程向下）
     sx = src.cx
@@ -485,11 +509,18 @@ def _edge_geometry(graph: Graph, e: Edge) -> dict[str, Any]:
 
 def _render_edge(graph: Graph, e: Edge) -> str:
     g = _edge_geometry(graph, e)
-    line = f'  <line class="edge" x1="{g["x1"]}" y1="{g["y1"]}" x2="{g["x2"]}" y2="{g["y2"]}" marker-end="url(#arrow)"/>'
-    parts = [line]
+    parts: list[str] = []
+    if g["type"] == "fork":
+        # 折线：垂直 → 水平 → 垂直（带箭头）
+        mid_y = (g["y1"] + g["y2"]) / 2
+        parts.append(f'  <line class="edge" x1="{g["x1"]}" y1="{g["y1"]}" x2="{g["x1"]}" y2="{mid_y}"/>')
+        parts.append(f'  <line class="edge" x1="{g["x1"]}" y1="{mid_y}" x2="{g["x2"]}" y2="{mid_y}"/>')
+        parts.append(f'  <line class="edge" x1="{g["x2"]}" y1="{mid_y}" x2="{g["x2"]}" y2="{g["y2"]}" marker-end="url(#arrow)"/>')
+    else:
+        line = f'  <line class="edge" x1="{g["x1"]}" y1="{g["y1"]}" x2="{g["x2"]}" y2="{g["y2"]}" marker-end="url(#arrow)"/>'
+        parts.append(line)
     if e.label:
-        anchor = "middle" if g["type"] != "horizontal" else "middle"
-        parts.append(f'  <text class="ts" x="{g["lx"]}" y="{g["ly"]}" text-anchor="{anchor}">{_xml_escape(e.label)}</text>')
+        parts.append(f'  <text class="ts" x="{g["lx"]}" y="{g["ly"]}" text-anchor="middle">{_xml_escape(e.label)}</text>')
     return "\n".join(parts)
 
 
