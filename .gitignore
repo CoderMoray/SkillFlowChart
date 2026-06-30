@@ -3,17 +3,25 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.venv/
+venv/
 
 # 编辑器
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
 
-# 临时输出
+# 临时/调试输出
 /tmp/
 *.log
+*-laidout.json
+
+# 开发过程文件（非开源发布所需）
+skillflowchart-design.md
+skill-flowchart-kit/
