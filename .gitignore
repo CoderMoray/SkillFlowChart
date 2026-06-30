@@ -25,3 +25,6 @@ Thumbs.db
 # 开发过程文件（非开源发布所需）
 skillflowchart-design.md
 skill-flowchart-kit/
+
+# 平台特定
+.trae/
