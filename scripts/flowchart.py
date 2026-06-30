@@ -329,39 +329,12 @@ def _assign_depth(graph: Graph) -> None:
         if len(ins) >= 2 and nid in graph.nodes
     }
 
-    # 迭代：非汇合/非侧支 节点先算
-    for _ in range(200):
+    # 单循环迭代：每轮同时更新非汇合点和汇合点，直到稳定
+    # 这样嵌套汇合点（汇合点的入边依赖另一个汇合点）也能正确传播
+    for _ in range(500):
         changed = False
+        # 非汇合点 + 汇合点作为 source：从每条出边传播 depth
         for u in graph.nodes:
-            if u in convergence:
-                continue
-            for e in out_edges[u]:
-                v = e.to_id
-                if v not in graph.nodes or v in convergence:
-                    continue
-                # 侧支：与决策同层（不算 +1）
-                if v in side_targets:
-                    target = depth[u]
-                else:
-                    target = depth[u] + 1
-                if depth[v] < target:
-                    depth[v] = target
-                    changed = True
-        if not changed:
-            break
-
-    # 汇合点：max(入边 level) + 1（汇合点在入边节点下一层）
-    for v in convergence:
-        ins = in_edges[v]
-        depth[v] = max(depth.get(e.from_id, 0) for e in ins) + 1
-
-    # 再迭代一轮，让汇合点之后的下游跟上
-    for _ in range(200):
-        changed = False
-        for u in graph.nodes:
-            if u in convergence:
-                # 汇合点作为 source 也传播
-                pass
             for e in out_edges[u]:
                 v = e.to_id
                 if v not in graph.nodes or v in convergence:
@@ -373,6 +346,13 @@ def _assign_depth(graph: Graph) -> None:
                 if depth[v] < target:
                     depth[v] = target
                     changed = True
+        # 汇合点：max(入边 level) + 1
+        for v in convergence:
+            ins = in_edges[v]
+            target = max(depth.get(e.from_id, 0) for e in ins) + 1
+            if depth[v] < target:
+                depth[v] = target
+                changed = True
         if not changed:
             break
 
