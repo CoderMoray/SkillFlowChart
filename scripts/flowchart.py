@@ -40,21 +40,22 @@ DEFAULT_LEGEND: list[dict[str, str]] = [
     {"label": "终止",      "fill": "#FCEBEB", "stroke": "#A32D2D"},
 ]
 
-# 暗色主题独立配色（深填充 + 亮描边，确保与深背景有明度差）
+# 暗色主题独立配色（HaluCatch 官方暗色色板）
+# 深填充(surface/surface2) + 亮描边(accent)，确保与深背景有明度差
 DARK_ROLE_COLORS: dict[str, dict[str, str]] = {
-    "ai":       {"fill": "#1e3a5f", "stroke": "#4a90d9", "text_class": "th"},
-    "output":   {"fill": "#2d2a5c", "stroke": "#9d8df5", "text_class": "th"},
-    "decision": {"fill": "#4a3a1a", "stroke": "#f0b429", "text_class": "ths"},
-    "script":   {"fill": "#14483a", "stroke": "#34d399", "text_class": "ths"},
-    "terminal": {"fill": "#4a1a1a", "stroke": "#f87171", "text_class": "th"},
+    "ai":       {"fill": "#1a1a2e", "stroke": "#6c63ff", "text_class": "th"},   # surface2 + accent 紫
+    "output":   {"fill": "#12121a", "stroke": "#00d4aa", "text_class": "th"},   # surface + accent2 青绿
+    "decision": {"fill": "#1a1a2e", "stroke": "#ffa94d", "text_class": "ths"},  # surface2 + orange
+    "script":   {"fill": "#12121a", "stroke": "#51cf66", "text_class": "ths"},  # surface + green
+    "terminal": {"fill": "#1a1a2e", "stroke": "#ff6b6b", "text_class": "th"},   # surface2 + red
 }
 
 DARK_LEGEND: list[dict[str, str]] = [
-    {"label": "AI 执行",   "fill": "#1e3a5f", "stroke": "#4a90d9"},
-    {"label": "输出/报告", "fill": "#2d2a5c", "stroke": "#9d8df5"},
-    {"label": "决策点",    "fill": "#4a3a1a", "stroke": "#f0b429"},
-    {"label": "脚本",      "fill": "#14483a", "stroke": "#34d399"},
-    {"label": "终止",      "fill": "#4a1a1a", "stroke": "#f87171"},
+    {"label": "AI 执行",   "fill": "#1a1a2e", "stroke": "#6c63ff"},
+    {"label": "输出/报告", "fill": "#12121a", "stroke": "#00d4aa"},
+    {"label": "决策点",    "fill": "#1a1a2e", "stroke": "#ffa94d"},
+    {"label": "脚本",      "fill": "#12121a", "stroke": "#51cf66"},
+    {"label": "终止",      "fill": "#1a1a2e", "stroke": "#ff6b6b"},
 ]
 
 # ---------------------------------------------------------------------------
@@ -77,13 +78,13 @@ THEMES: dict[str, dict[str, Any]] = {
         "node_alpha_darken": False,
     },
     "dark": {
-        "bg": "#15151a",
-        "text": "#e8e6e0",
-        "subtitle": "#9a9890",
-        "title_color": "#e8e6e0",
-        "edge_stroke": "#5a5852",
-        "edge_dash_stroke": "#3a3834",
-        "label_halo": "#15151a",
+        "bg": "#0a0a0f",
+        "text": "#e0e0f0",
+        "subtitle": "#8888aa",
+        "title_color": "#e0e0f0",
+        "edge_stroke": "#2a2a3e",
+        "edge_dash_stroke": "#1a1a2e",
+        "label_halo": "#0a0a0f",
         "use_halo": True,
         "role_colors": DARK_ROLE_COLORS,
         "legend": DARK_LEGEND,
@@ -387,33 +388,44 @@ def _assign_y(graph: Graph) -> None:
     """按主干路深度分配 y。
 
     规则：
-    - 每个主干层级 +1 UNIT_H
+    - 每个主干层级的「中心到中心」距离 = UNIT_H
     - 如果相邻层级之间的边有 label 文本 → 额外 +0.5 UNIT_H
-    - 侧支节点（与决策同 level）y = 决策 y
+    - 但实际 y 通过「上一行底部 + 净间距」累加，确保不同高度节点的间距一致
     """
     from collections import defaultdict
     by_level: dict[int, list[Node]] = defaultdict(list)
     for n in graph.nodes.values():
         by_level[n.level].append(n)
 
-    # 建立边索引：from_level → 是否有 label
-    edges_by_from_level: dict[int, list[bool]] = defaultdict(list)
+    # 建立 from_level → to_level 的边索引（含 label 信息）
+    edges_between: dict[tuple[int, int], list[bool]] = defaultdict(list)
     for e in graph.edges:
         if e.from_id in graph.nodes and e.to_id in graph.nodes:
             src_lvl = graph.nodes[e.from_id].level
-            edges_by_from_level[src_lvl].append(bool(e.label))
+            dst_lvl = graph.nodes[e.to_id].level
+            if src_lvl != dst_lvl:  # 只看跨层边
+                edges_between[(src_lvl, dst_lvl)].append(bool(e.label))
+
+    # 净间距常量（上一行底部到下一行顶部）
+    GAP_NORMAL = 32.0    # 无 label 时的净间距
+    GAP_WITH_LABEL = 56.0  # 有 label 时的净间距（多留空间放文字）
 
     sorted_levels = sorted(by_level.keys())
     level_y: dict[int, float] = {}
     for i, lvl in enumerate(sorted_levels):
+        nodes = by_level[lvl]
+        max_h = max(n.height for n in nodes)
         if i == 0:
             level_y[lvl] = TOP_PAD
         else:
             prev_lvl = sorted_levels[i - 1]
-            # 检查 prev_lvl → lvl 之间是否有 label 边
-            has_label = any(edges_by_from_level.get(prev_lvl, []))
-            gap = UNIT_H + (HALF_UNIT_H if has_label else 0.0)
-            level_y[lvl] = level_y[prev_lvl] + gap
+            prev_nodes = by_level[prev_lvl]
+            prev_max_h = max(n.height for n in prev_nodes)
+            prev_bottom = level_y[prev_lvl] + prev_max_h / 2
+            # 检查 prev_lvl → lvl 之间的边是否有 label
+            has_label = any(edges_between.get((prev_lvl, lvl), []))
+            gap = GAP_WITH_LABEL if has_label else GAP_NORMAL
+            level_y[lvl] = prev_bottom + gap + max_h / 2
     for lvl, y in level_y.items():
         for n in by_level[lvl]:
             n.cy = y
@@ -641,21 +653,29 @@ def _render_convergence(graph: Graph, theme: dict[str, Any]) -> list[str]:
     return parts
 
 
-def _render_legend(graph: Graph, svg_w: float, theme: dict[str, Any]) -> str:
+def _render_legend(graph: Graph, svg_x: float, svg_w: float, theme: dict[str, Any]) -> str:
     items = theme.get("legend") or graph.legend or DEFAULT_LEGEND
-    widths = [len(it["label"]) * 14 + 40 for it in items]
-    total = sum(widths) - 16
-    start_x = (svg_w - total) / 2
+    # 每个图例项：色块内放文本，宽度根据文本长度估算
+    item_widths = [len(it["label"]) * 14 + 24 for it in items]
+    item_height = 24
+    gap = 12
+    total = sum(item_widths) + gap * (len(items) - 1)
+    start_x = svg_x + (svg_w - total) / 2
     max_bottom = max((n.cy + n.height / 2 for n in graph.nodes.values()), default=600)
-    y = max_bottom + 40
-    parts = []
+    sep_y = max_bottom + 64
+    legend_y = sep_y + 24
+    parts: list[str] = []
+    # 分隔线
+    parts.append(f'  <line x1="{svg_x + 40}" y1="{sep_y}" x2="{svg_x + svg_w - 40}" y2="{sep_y}" stroke="{theme["edge_dash_stroke"]}" stroke-width="0.5"/>')
+    # "图例" 标题
+    parts.append(f'  <text class="ts" x="{svg_x + svg_w / 2}" y="{sep_y + 12}" text-anchor="middle" dominant-baseline="central">图例</text>')
     cur = start_x
-    for it, w in zip(items, widths):
+    for it, w in zip(items, item_widths):
         fill = it["fill"]
         stroke = it["stroke"]
-        parts.append(f'  <rect x="{cur}" y="{y}" width="16" height="12" rx="3" fill="{fill}" stroke="{stroke}" stroke-width="0.5"/>')
-        parts.append(f'  <text class="ts" x="{cur + 20}" y="{y + 6}" dominant-baseline="central">{_xml_escape(it["label"])}</text>')
-        cur += w
+        parts.append(f'  <rect x="{cur}" y="{legend_y}" width="{w}" height="{item_height}" rx="6" fill="{fill}" stroke="{stroke}" stroke-width="0.5"/>')
+        parts.append(f'  <text class="ts" x="{cur + w / 2}" y="{legend_y + item_height / 2}" text-anchor="middle" dominant-baseline="central">{_xml_escape(it["label"])}</text>')
+        cur += w + gap
     return "\n".join(parts)
 
 
@@ -667,8 +687,9 @@ def _update_viewbox(graph: Graph) -> tuple[float, float, float, float]:
         xs.extend([n.cx - hw, n.cx + hw])
         ys.extend([n.cy - hh, n.cy + hh])
     pad_x = 40
-    pad_top = 32
-    pad_bottom = 80
+    pad_top = 24
+    # 底部留白：主图底部到图例分隔线 64 + 标题 24 + 色块 24 + 底部 padding 20
+    pad_bottom = 64 + 24 + 24 + 20
     min_x = min(xs) - pad_x
     max_x = max(xs) + pad_x
     max_y = max(ys) + pad_bottom
@@ -734,7 +755,7 @@ def render_svg(graph: Graph, theme: dict[str, Any]) -> str:
     for n in graph.nodes.values():
         parts.append(_render_node(n, theme))
     # 图例
-    parts.append(_render_legend(graph, vb_w, theme))
+    parts.append(_render_legend(graph, vb_x, vb_w, theme))
     parts.append('</svg>')
     return "\n".join(parts)
 
@@ -760,10 +781,10 @@ def render_html(graph: Graph, theme: dict[str, Any]) -> str:
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 40px 20px;
+      padding: 24px 20px;
     }}
     h1 {{ font-size: 20px; font-weight: 500; margin-bottom: 8px; color: {title_color}; }}
-    .subtitle {{ font-size: 13px; color: {subtitle_color}; margin-bottom: 32px; }}
+    .subtitle {{ font-size: 13px; color: {subtitle_color}; margin-bottom: 16px; }}
     svg {{ max-width: 760px; width: 100%; height: auto; }}
   </style>
 </head>
