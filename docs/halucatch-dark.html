@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HaluCatch 执行决策流程图</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1e1e22;
+      color: #e8e6e0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+    h1 { font-size: 20px; font-weight: 500; margin-bottom: 8px; color: #e8e6e0; }
+    .subtitle { font-size: 13px; color: #8a8880; margin-bottom: 32px; }
+    svg { max-width: 760px; width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+  <h1>HaluCatch · AI 执行决策流程图</h1>
+  <p class="subtitle">从用户调用到报告落盘的完整决策树</p>
+<svg viewBox="-60.0 0 776.0 804.0" width="100%" role="img">
+  <title>HaluCatch 执行决策流程图</title>
+  <rect x="-60.0" y="0" width="776.0" height="804.0" fill="#1e1e22"/>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#6a6862" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <style>
+    .t { font-family: system-ui, sans-serif; font-size: 14px; fill: #d8d6d0; }
+    .ts { font-family: system-ui, sans-serif; font-size: 12px; fill: #8a8880; }
+    .th { font-family: system-ui, sans-serif; font-size: 14px; font-weight: 500; fill: #d8d6d0; }
+    .ths { font-family: system-ui, sans-serif; font-size: 12px; font-weight: 500; fill: #d8d6d0; }
+    .edge { fill: none; stroke: #6a6862; stroke-width: 1.2; }
+    .edge-dash { fill: none; stroke: #4a4844; stroke-width: 0.8; stroke-dasharray: 4 3; }
+  </style>
+  <line class="edge" x1="340.0" y1="76.0" x2="340.0" y2="100.0" marker-end="url(#arrow)"/>
+  <line class="edge" x1="265.0" y1="130.0" x2="150.0" y2="130.0" marker-end="url(#arrow)"/>
+  <text class="ts" x="207.5" y="122.0" text-anchor="middle" paint-order="stroke" stroke="#1e1e22" stroke-width="3">否</text>
+  <line class="edge" x1="340.0" y1="160.0" x2="340.0" y2="214.0" marker-end="url(#arrow)"/>
+  <text class="ts" x="340.0" y="181.0" text-anchor="middle" paint-order="stroke" stroke="#1e1e22" stroke-width="3">是</text>
+  <line class="edge" x1="415.0" y1="244.0" x2="456.0" y2="244.0" marker-end="url(#arrow)"/>
+  <text class="ts" x="435.5" y="236.0" text-anchor="middle" paint-order="stroke" stroke="#1e1e22" stroke-width="3">val</text>
+  <line class="edge" x1="566.0" y1="272.0" x2="566.0" y2="336.0" marker-end="url(#arrow)"/>
+  <line class="edge" x1="340.0" y1="274.0" x2="340.0" y2="330.0" marker-end="url(#arrow)"/>
+  <text class="ts" x="340.0" y="296.0" text-anchor="middle" paint-order="stroke" stroke="#1e1e22" stroke-width="3">非val</text>
+  <line class="edge" x1="340.0" y1="386.0" x2="340.0" y2="396.0"/>
+  <line class="edge" x1="340.0" y1="396.0" x2="190.0" y2="396.0"/>
+  <line class="edge" x1="190.0" y1="396.0" x2="190.0" y2="406.0" marker-end="url(#arrow)"/>
+  <line class="edge" x1="340.0" y1="386.0" x2="340.0" y2="396.0"/>
+  <line class="edge" x1="340.0" y1="396.0" x2="490.0" y2="396.0"/>
+  <line class="edge" x1="490.0" y1="396.0" x2="490.0" y2="406.0" marker-end="url(#arrow)"/>
+  <line class="edge" x1="340.0" y1="538.0" x2="340.0" y2="558.0" marker-end="url(#arrow)"/>
+  <line class="edge" x1="340.0" y1="614.0" x2="340.0" y2="632.0" marker-end="url(#arrow)"/>
+  <line class="edge" x1="265.0" y1="662.0" x2="200.0" y2="662.0" marker-end="url(#arrow)"/>
+  <text class="ts" x="232.5" y="654.0" text-anchor="middle" paint-order="stroke" stroke="#1e1e22" stroke-width="3">修</text>
+  <line class="edge" x1="415.0" y1="662.0" x2="506.0" y2="662.0" marker-end="url(#arrow)"/>
+  <text class="ts" x="460.5" y="654.0" text-anchor="middle" paint-order="stroke" stroke="#1e1e22" stroke-width="3">不修</text>
+  <line class="edge" x1="190.0" y1="462.0" x2="190.0" y2="462.0"/>
+  <line class="edge" x1="490.0" y1="462.0" x2="490.0" y2="462.0"/>
+  <line class="edge" x1="190.0" y1="462.0" x2="490.0" y2="462.0"/>
+  <line class="edge" x1="340.0" y1="462.0" x2="340.0" y2="482.0" marker-end="url(#arrow)"/>
+  <rect x="230.0" y="32.0" width="220" height="44" rx="10" fill="#505457" stroke="#0e3963" stroke-width="0.5"/>
+  <text class="th" x="340.0" y="54.0" text-anchor="middle" dominant-baseline="central">用户调用 HaluCatch</text>
+  <polygon points="340.0,100.0 415.0,130.0 340.0,160.0 265.0,130.0" fill="#57534c" stroke="#4f2f06" stroke-width="0.5"/>
+  <text class="ths" x="340.0" y="130.0" text-anchor="middle" dominant-baseline="central">路径存在?</text>
+  <rect x="30.0" y="108.0" width="120" height="44" rx="8" fill="#585252" stroke="#611b1b" stroke-width="0.5"/>
+  <text class="th" x="90.0" y="130.0" text-anchor="middle" dominant-baseline="central">报错退出</text>
+  <polygon points="340.0,214.0 415.0,244.0 340.0,274.0 265.0,244.0" fill="#57534c" stroke="#4f2f06" stroke-width="0.5"/>
+  <text class="ths" x="340.0" y="244.0" text-anchor="middle" dominant-baseline="central">模式?</text>
+  <rect x="456.0" y="216.0" width="220" height="56" rx="8" fill="#4e5553" stroke="#094233" stroke-width="0.5"/>
+  <text class="ths" x="566.0" y="237.0" text-anchor="middle" dominant-baseline="central">L1 脚本扫描</text>
+  <text class="ts" x="566.0" y="254.0" text-anchor="middle" dominant-baseline="central" fill="#094233">--validate</text>
+  <rect x="506.0" y="336.0" width="120" height="44" rx="8" fill="#585252" stroke="#611b1b" stroke-width="0.5"/>
+  <text class="th" x="566.0" y="358.0" text-anchor="middle" dominant-baseline="central">结束</text>
+  <rect x="230.0" y="330.0" width="220" height="56" rx="8" fill="#505457" stroke="#0e3963" stroke-width="0.5"/>
+  <text class="th" x="340.0" y="351.0" text-anchor="middle" dominant-baseline="central">Phase 0: 技能分类</text>
+  <text class="ts" x="340.0" y="368.0" text-anchor="middle" dominant-baseline="central" fill="#8a8880">含 .py / .xlsx / pd.read_ ?</text>
+  <rect x="80.0" y="406.0" width="220" height="56" rx="8" fill="#505457" stroke="#0e3963" stroke-width="0.5"/>
+  <text class="th" x="190.0" y="427.0" text-anchor="middle" dominant-baseline="central">数据驱动型</text>
+  <text class="ts" x="190.0" y="444.0" text-anchor="middle" dominant-baseline="central" fill="#8a8880">L2+L3 四维评估</text>
+  <rect x="380.0" y="406.0" width="220" height="56" rx="8" fill="#505457" stroke="#0e3963" stroke-width="0.5"/>
+  <text class="th" x="490.0" y="427.0" text-anchor="middle" dominant-baseline="central">纯方法论型</text>
+  <text class="ts" x="490.0" y="444.0" text-anchor="middle" dominant-baseline="central" fill="#8a8880">L3 方法论评估</text>
+  <rect x="230.0" y="482.0" width="220" height="56" rx="8" fill="#505457" stroke="#0e3963" stroke-width="0.5"/>
+  <text class="th" x="340.0" y="503.0" text-anchor="middle" dominant-baseline="central">L2 脚本基线 + L3 AI 补充</text>
+  <text class="ts" x="340.0" y="520.0" text-anchor="middle" dominant-baseline="central" fill="#8a8880">地基 · 代码 · 规则 · 护栏</text>
+  <rect x="230.0" y="558.0" width="220" height="56" rx="10" fill="#535258" stroke="#312c6d" stroke-width="0.5"/>
+  <text class="th" x="340.0" y="579.0" text-anchor="middle" dominant-baseline="central">Phase 3: 三版报告生成</text>
+  <text class="ts" x="340.0" y="596.0" text-anchor="middle" dominant-baseline="central" fill="#312c6d">专业版 / 通俗版 / AI 行动版 → 落盘</text>
+  <polygon points="340.0,632.0 415.0,662.0 340.0,692.0 265.0,662.0" fill="#57534c" stroke="#4f2f06" stroke-width="0.5"/>
+  <text class="ths" x="340.0" y="662.0" text-anchor="middle" dominant-baseline="central">修复?</text>
+  <rect x="-20.0" y="640.0" width="220" height="44" rx="8" fill="#4e5553" stroke="#094233" stroke-width="0.5"/>
+  <text class="ths" x="90.0" y="662.0" text-anchor="middle" dominant-baseline="central">生成修复方案</text>
+  <rect x="506.0" y="640.0" width="120" height="44" rx="8" fill="#585252" stroke="#611b1b" stroke-width="0.5"/>
+  <text class="th" x="566.0" y="662.0" text-anchor="middle" dominant-baseline="central">结束</text>
+  <rect x="177.0" y="732.0" width="16" height="12" rx="3" fill="#505457" stroke="#0e3963" stroke-width="0.5"/>
+  <text class="ts" x="197.0" y="738.0" dominant-baseline="central">AI 执行</text>
+  <rect x="287.0" y="732.0" width="16" height="12" rx="3" fill="#535258" stroke="#312c6d" stroke-width="0.5"/>
+  <text class="ts" x="307.0" y="738.0" dominant-baseline="central">输出/报告</text>
+  <rect x="397.0" y="732.0" width="16" height="12" rx="3" fill="#57534c" stroke="#4f2f06" stroke-width="0.5"/>
+  <text class="ts" x="417.0" y="738.0" dominant-baseline="central">决策点</text>
+  <rect x="479.0" y="732.0" width="16" height="12" rx="3" fill="#4e5553" stroke="#094233" stroke-width="0.5"/>
+  <text class="ts" x="499.0" y="738.0" dominant-baseline="central">脚本</text>
+  <rect x="547.0" y="732.0" width="16" height="12" rx="3" fill="#585252" stroke="#611b1b" stroke-width="0.5"/>
+  <text class="ts" x="567.0" y="738.0" dominant-baseline="central">终止</text>
+</svg>
+</body>
+</html>

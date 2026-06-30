@@ -40,6 +40,49 @@ DEFAULT_LEGEND: list[dict[str, str]] = [
     {"label": "终止",      "fill": "#FCEBEB", "stroke": "#A32D2D"},
 ]
 
+# ---------------------------------------------------------------------------
+# 主题
+# ---------------------------------------------------------------------------
+# light:     白底，标签用白色光晕遮线
+# dark:      深底，标签用深色光晕遮线
+# transparent: 无底色，垂直边标签偏移到线一侧（不遮线）
+
+THEMES: dict[str, dict[str, Any]] = {
+    "light": {
+        "bg": "#ffffff",
+        "text": "#2C2C2A",
+        "subtitle": "#888780",
+        "title_color": "#2C2C2A",
+        "edge_stroke": "#888780",
+        "edge_dash_stroke": "#B4B2A9",
+        "label_halo": "#ffffff",
+        "use_halo": True,
+        "node_alpha_darken": False,
+    },
+    "dark": {
+        "bg": "#1e1e22",
+        "text": "#d8d6d0",
+        "subtitle": "#8a8880",
+        "title_color": "#e8e6e0",
+        "edge_stroke": "#6a6862",
+        "edge_dash_stroke": "#4a4844",
+        "label_halo": "#1e1e22",
+        "use_halo": True,
+        "node_alpha_darken": True,
+    },
+    "transparent": {
+        "bg": None,
+        "text": "#2C2C2A",
+        "subtitle": "#888780",
+        "title_color": "#2C2C2A",
+        "edge_stroke": "#888780",
+        "edge_dash_stroke": "#B4B2A9",
+        "label_halo": None,
+        "use_halo": False,
+        "node_alpha_darken": False,
+    },
+}
+
 # 布局参数（与参考图对齐）
 CENTER_X = 340.0          # 主流程中轴 X
 SIDE_LEFT_X = 90.0        # 左侧支节点中心 X（终端节点）
@@ -438,9 +481,10 @@ def _node_polygon_points(n: Node) -> str:
     return f"{n.cx},{n.cy - DIAMOND_HALF_H} {n.cx + DIAMOND_HALF_W},{n.cy} {n.cx},{n.cy + DIAMOND_HALF_H} {n.cx - DIAMOND_HALF_W},{n.cy}"
 
 
-def _render_node(n: Node) -> str:
+def _render_node(n: Node, theme: dict[str, Any]) -> str:
     colors = ROLE_COLORS.get(n.role, ROLE_COLORS["ai"])
-    fill, stroke, tcls = colors["fill"], colors["stroke"], colors["text_class"]
+    tcls = colors["text_class"]
+    fill, stroke = _node_colors(n, theme)
     parts: list[str] = []
     if n.type == "decision":
         parts.append(f'  <polygon points="{_node_polygon_points(n)}" fill="{fill}" stroke="{stroke}" stroke-width="0.5"/>')
@@ -452,7 +496,7 @@ def _render_node(n: Node) -> str:
         parts.append(f'  <rect x="{x}" y="{y}" width="{n.width}" height="{n.height}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="0.5"/>')
         if n.subtitle:
             parts.append(f'  <text class="{tcls}" x="{n.cx}" y="{n.cy - 7}" text-anchor="middle" dominant-baseline="central">{_xml_escape(n.label)}</text>')
-            sub_color = stroke if n.role in ("script", "output") else "#5F5E5A"
+            sub_color = stroke if n.role in ("script", "output") else theme["subtitle"]
             parts.append(f'  <text class="ts" x="{n.cx}" y="{n.cy + 10}" text-anchor="middle" dominant-baseline="central" fill="{sub_color}">{_xml_escape(n.subtitle)}</text>')
         else:
             parts.append(f'  <text class="{tcls}" x="{n.cx}" y="{n.cy}" text-anchor="middle" dominant-baseline="central">{_xml_escape(n.label)}</text>')
@@ -507,24 +551,42 @@ def _edge_geometry(graph: Graph, e: Edge) -> dict[str, Any]:
     return {"type": "vertical", "x1": sx, "y1": sy, "x2": ex, "y2": ey, "lx": lx, "ly": ly}
 
 
-def _render_edge(graph: Graph, e: Edge) -> str:
+def _render_edge(graph: Graph, e: Edge, theme: dict[str, Any]) -> str:
     g = _edge_geometry(graph, e)
     parts: list[str] = []
+    edge_class = "edge"
     if g["type"] == "fork":
         # 折线：垂直 → 水平 → 垂直（带箭头）
         mid_y = (g["y1"] + g["y2"]) / 2
-        parts.append(f'  <line class="edge" x1="{g["x1"]}" y1="{g["y1"]}" x2="{g["x1"]}" y2="{mid_y}"/>')
-        parts.append(f'  <line class="edge" x1="{g["x1"]}" y1="{mid_y}" x2="{g["x2"]}" y2="{mid_y}"/>')
-        parts.append(f'  <line class="edge" x1="{g["x2"]}" y1="{mid_y}" x2="{g["x2"]}" y2="{g["y2"]}" marker-end="url(#arrow)"/>')
+        parts.append(f'  <line class="{edge_class}" x1="{g["x1"]}" y1="{g["y1"]}" x2="{g["x1"]}" y2="{mid_y}"/>')
+        parts.append(f'  <line class="{edge_class}" x1="{g["x1"]}" y1="{mid_y}" x2="{g["x2"]}" y2="{mid_y}"/>')
+        parts.append(f'  <line class="{edge_class}" x1="{g["x2"]}" y1="{mid_y}" x2="{g["x2"]}" y2="{g["y2"]}" marker-end="url(#arrow)"/>')
     else:
-        line = f'  <line class="edge" x1="{g["x1"]}" y1="{g["y1"]}" x2="{g["x2"]}" y2="{g["y2"]}" marker-end="url(#arrow)"/>'
+        line = f'  <line class="{edge_class}" x1="{g["x1"]}" y1="{g["y1"]}" x2="{g["x2"]}" y2="{g["y2"]}" marker-end="url(#arrow)"/>'
         parts.append(line)
     if e.label:
-        parts.append(f'  <text class="ts" x="{g["lx"]}" y="{g["ly"]}" text-anchor="middle">{_xml_escape(e.label)}</text>')
+        lx, ly = g["lx"], g["ly"]
+        anchor = "middle"
+        halo_attr = ""
+        if theme["use_halo"]:
+            halo_attr = f' paint-order="stroke" stroke="{theme["label_halo"]}" stroke-width="3"'
+        elif g["type"] == "vertical":
+            # 透明主题：垂直边标签偏移到线一侧
+            mid_x = g["x1"]  # 垂直边 x1 == x2
+            if mid_x > CENTER_X:
+                lx = mid_x - 6
+                anchor = "end"
+            elif mid_x < CENTER_X:
+                lx = mid_x + 6
+                anchor = "start"
+            else:
+                lx = mid_x + 6
+                anchor = "start"
+        parts.append(f'  <text class="ts" x="{lx}" y="{ly}" text-anchor="{anchor}"{halo_attr}>{_xml_escape(e.label)}</text>')
     return "\n".join(parts)
 
 
-def _render_convergence(graph: Graph) -> list[str]:
+def _render_convergence(graph: Graph, theme: dict[str, Any]) -> list[str]:
     """汇合点：多条入边画成「垂直→水平→垂直」三段。
 
     仅对入边 ≥2 且入边来自不同 x 的节点处理。
@@ -560,19 +622,22 @@ def _render_convergence(graph: Graph) -> list[str]:
     return parts
 
 
-def _render_legend(graph: Graph, svg_w: float) -> str:
+def _render_legend(graph: Graph, svg_w: float, theme: dict[str, Any]) -> str:
     items = graph.legend or DEFAULT_LEGEND
-    # 估算
     widths = [len(it["label"]) * 14 + 40 for it in items]
     total = sum(widths) - 16
     start_x = (svg_w - total) / 2
-    # y：最底部节点下方
     max_bottom = max((n.cy + n.height / 2 for n in graph.nodes.values()), default=600)
     y = max_bottom + 40
     parts = []
     cur = start_x
     for it, w in zip(items, widths):
-        parts.append(f'  <rect x="{cur}" y="{y}" width="16" height="12" rx="3" fill="{it["fill"]}" stroke="{it["stroke"]}" stroke-width="0.5"/>')
+        fill = it["fill"]
+        stroke = it["stroke"]
+        if theme.get("node_alpha_darken"):
+            fill = _darken_color(fill, 0.35)
+            stroke = _darken_color(stroke, 0.6)
+        parts.append(f'  <rect x="{cur}" y="{y}" width="16" height="12" rx="3" fill="{fill}" stroke="{stroke}" stroke-width="0.5"/>')
         parts.append(f'  <text class="ts" x="{cur + 20}" y="{y + 6}" dominant-baseline="central">{_xml_escape(it["label"])}</text>')
         cur += w
     return "\n".join(parts)
@@ -594,30 +659,58 @@ def _update_viewbox(graph: Graph) -> tuple[float, float, float, float]:
     return min_x, 0, max_x - min_x, max_y + pad_top
 
 
-def render_svg(graph: Graph) -> str:
+def _darken_color(hex_color: str, factor: float = 0.6) -> str:
+    """把 hex 颜色变暗（用于暗色主题节点填充）。"""
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    r = int(r * factor)
+    g = int(g * factor)
+    b = int(b * factor)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _node_colors(n: Node, theme: dict[str, Any]) -> tuple[str, str]:
+    """返回 (fill, stroke)，暗色主题下变暗。"""
+    colors = ROLE_COLORS.get(n.role, ROLE_COLORS["ai"])
+    fill, stroke = colors["fill"], colors["stroke"]
+    if theme.get("node_alpha_darken"):
+        fill = _darken_color(fill, 0.35)
+        stroke = _darken_color(stroke, 0.6)
+    return fill, stroke
+
+
+def render_svg(graph: Graph, theme: dict[str, Any]) -> str:
     vb_x, vb_y, vb_w, vb_h = _update_viewbox(graph)
     parts: list[str] = []
     parts.append(f'<svg viewBox="{vb_x} {vb_y} {vb_w} {vb_h}" width="100%" role="img">')
     parts.append(f'  <title>{_xml_escape(graph.title)} 执行决策流程图</title>')
+    # 背景（light/dark 画背景 rect；transparent 不画）
+    if theme["bg"] is not None:
+        parts.append(f'  <rect x="{vb_x}" y="{vb_y}" width="{vb_w}" height="{vb_h}" fill="{theme["bg"]}"/>')
     parts.append('  <defs>')
-    parts.append('    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">')
-    parts.append('      <path d="M2 1L8 5L2 9" fill="none" stroke="#5F5E5A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>')
+    arrow_stroke = theme["edge_stroke"]
+    parts.append(f'    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">')
+    parts.append(f'      <path d="M2 1L8 5L2 9" fill="none" stroke="{arrow_stroke}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>')
     parts.append('    </marker>')
     parts.append('  </defs>')
+    text_color = theme["text"]
+    subtitle_color = theme["subtitle"]
+    edge_stroke = theme["edge_stroke"]
+    edge_dash_stroke = theme["edge_dash_stroke"]
     parts.append('  <style>')
-    parts.append('    .t { font-family: system-ui, sans-serif; font-size: 14px; fill: #2C2C2A; }')
-    parts.append('    .ts { font-family: system-ui, sans-serif; font-size: 12px; fill: #5F5E5A; }')
-    parts.append('    .th { font-family: system-ui, sans-serif; font-size: 14px; font-weight: 500; fill: #2C2C2A; }')
-    parts.append('    .ths { font-family: system-ui, sans-serif; font-size: 12px; font-weight: 500; fill: #2C2C2A; }')
-    parts.append('    .edge { fill: none; stroke: #888780; stroke-width: 1.2; }')
-    parts.append('    .edge-dash { fill: none; stroke: #B4B2A9; stroke-width: 0.8; stroke-dasharray: 4 3; }')
+    parts.append(f'    .t {{ font-family: system-ui, sans-serif; font-size: 14px; fill: {text_color}; }}')
+    parts.append(f'    .ts {{ font-family: system-ui, sans-serif; font-size: 12px; fill: {subtitle_color}; }}')
+    parts.append(f'    .th {{ font-family: system-ui, sans-serif; font-size: 14px; font-weight: 500; fill: {text_color}; }}')
+    parts.append(f'    .ths {{ font-family: system-ui, sans-serif; font-size: 12px; font-weight: 500; fill: {text_color}; }}')
+    parts.append(f'    .edge {{ fill: none; stroke: {edge_stroke}; stroke-width: 1.2; }}')
+    parts.append(f'    .edge-dash {{ fill: none; stroke: {edge_dash_stroke}; stroke-width: 0.8; stroke-dasharray: 4 3; }}')
     parts.append('  </style>')
 
     # 识别汇合点入边（由汇合三段接管，普通渲染跳过）
     in_edges_map: dict[str, list[Edge]] = {nid: [] for nid in graph.nodes}
     for e in graph.edges:
         in_edges_map[e.to_id].append(e)
-    convergence_edges: set[int] = set()  # 用 id() 标记要跳过的边
+    convergence_edges: set[int] = set()
     for nid, ins in in_edges_map.items():
         if len(ins) < 2:
             continue
@@ -631,21 +724,24 @@ def render_svg(graph: Graph) -> str:
     for e in graph.edges:
         if id(e) in convergence_edges:
             continue
-        parts.append(_render_edge(graph, e))
+        parts.append(_render_edge(graph, e, theme))
     # 汇合三段
-    parts.extend(_render_convergence(graph))
+    parts.extend(_render_convergence(graph, theme))
     # 节点
     for n in graph.nodes.values():
-        parts.append(_render_node(n))
+        parts.append(_render_node(n, theme))
     # 图例
-    parts.append(_render_legend(graph, vb_w))
+    parts.append(_render_legend(graph, vb_w, theme))
     parts.append('</svg>')
     return "\n".join(parts)
 
 
-def render_html(graph: Graph) -> str:
-    svg = render_svg(graph)
+def render_html(graph: Graph, theme: dict[str, Any]) -> str:
+    svg = render_svg(graph, theme)
     subtitle = graph.subtitle or ""
+    bg = theme["bg"] if theme["bg"] else "transparent"
+    title_color = theme["title_color"]
+    subtitle_color = theme["subtitle"]
     return f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -656,15 +752,15 @@ def render_html(graph: Graph) -> str:
     * {{ margin: 0; padding: 0; box-sizing: border-box; }}
     body {{
       font-family: system-ui, -apple-system, sans-serif;
-      background: #fff;
-      color: #2C2C2A;
+      background: {bg};
+      color: {title_color};
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 40px 20px;
     }}
-    h1 {{ font-size: 20px; font-weight: 500; margin-bottom: 8px; }}
-    .subtitle {{ font-size: 13px; color: #888780; margin-bottom: 32px; }}
+    h1 {{ font-size: 20px; font-weight: 500; margin-bottom: 8px; color: {title_color}; }}
+    .subtitle {{ font-size: 13px; color: {subtitle_color}; margin-bottom: 32px; }}
     svg {{ max-width: 760px; width: 100%; height: auto; }}
   </style>
 </head>
@@ -691,16 +787,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Skill 决策流程图生成器")
     parser.add_argument("nodes_json", help="nodes.json 路径")
     parser.add_argument("--out", default="docs/decision-flowchart.html", help="输出 HTML 路径")
+    parser.add_argument("--theme", default="light", choices=list(THEMES.keys()), help="主题: light / dark / transparent")
     parser.add_argument("--json-out", default="", help="输出布局后 JSON 路径（调试用）")
     args = parser.parse_args()
 
+    theme = THEMES[args.theme]
     graph = load_graph(args.nodes_json)
     layout(graph)
 
-    html = render_html(graph)
+    html = render_html(graph, theme)
     with open(args.out, "w", encoding="utf-8") as f:
         f.write(html)
-    print(f"[完成] 节点: {len(graph.nodes)}, 边: {len(graph.edges)}, 分支: {len(graph.branches)}, 回环: {len(graph.loops)}")
+    print(f"[完成] 节点: {len(graph.nodes)}, 边: {len(graph.edges)}, 主题: {args.theme}")
     print(f"[输出] {args.out}")
 
     if args.json_out:
