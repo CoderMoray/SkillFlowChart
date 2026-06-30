@@ -40,6 +40,23 @@ DEFAULT_LEGEND: list[dict[str, str]] = [
     {"label": "终止",      "fill": "#FCEBEB", "stroke": "#A32D2D"},
 ]
 
+# 暗色主题独立配色（深填充 + 亮描边，确保与深背景有明度差）
+DARK_ROLE_COLORS: dict[str, dict[str, str]] = {
+    "ai":       {"fill": "#1e3a5f", "stroke": "#4a90d9", "text_class": "th"},
+    "output":   {"fill": "#2d2a5c", "stroke": "#9d8df5", "text_class": "th"},
+    "decision": {"fill": "#4a3a1a", "stroke": "#f0b429", "text_class": "ths"},
+    "script":   {"fill": "#14483a", "stroke": "#34d399", "text_class": "ths"},
+    "terminal": {"fill": "#4a1a1a", "stroke": "#f87171", "text_class": "th"},
+}
+
+DARK_LEGEND: list[dict[str, str]] = [
+    {"label": "AI 执行",   "fill": "#1e3a5f", "stroke": "#4a90d9"},
+    {"label": "输出/报告", "fill": "#2d2a5c", "stroke": "#9d8df5"},
+    {"label": "决策点",    "fill": "#4a3a1a", "stroke": "#f0b429"},
+    {"label": "脚本",      "fill": "#14483a", "stroke": "#34d399"},
+    {"label": "终止",      "fill": "#4a1a1a", "stroke": "#f87171"},
+]
+
 # ---------------------------------------------------------------------------
 # 主题
 # ---------------------------------------------------------------------------
@@ -60,15 +77,16 @@ THEMES: dict[str, dict[str, Any]] = {
         "node_alpha_darken": False,
     },
     "dark": {
-        "bg": "#1e1e22",
-        "text": "#d8d6d0",
-        "subtitle": "#8a8880",
+        "bg": "#15151a",
+        "text": "#e8e6e0",
+        "subtitle": "#9a9890",
         "title_color": "#e8e6e0",
-        "edge_stroke": "#6a6862",
-        "edge_dash_stroke": "#4a4844",
-        "label_halo": "#1e1e22",
+        "edge_stroke": "#5a5852",
+        "edge_dash_stroke": "#3a3834",
+        "label_halo": "#15151a",
         "use_halo": True,
-        "node_alpha_darken": True,
+        "role_colors": DARK_ROLE_COLORS,
+        "legend": DARK_LEGEND,
     },
     "transparent": {
         "bg": None,
@@ -482,7 +500,8 @@ def _node_polygon_points(n: Node) -> str:
 
 
 def _render_node(n: Node, theme: dict[str, Any]) -> str:
-    colors = ROLE_COLORS.get(n.role, ROLE_COLORS["ai"])
+    role_colors = theme.get("role_colors") or ROLE_COLORS
+    colors = role_colors.get(n.role, role_colors.get("ai", ROLE_COLORS["ai"]))
     tcls = colors["text_class"]
     fill, stroke = _node_colors(n, theme)
     parts: list[str] = []
@@ -623,7 +642,7 @@ def _render_convergence(graph: Graph, theme: dict[str, Any]) -> list[str]:
 
 
 def _render_legend(graph: Graph, svg_w: float, theme: dict[str, Any]) -> str:
-    items = graph.legend or DEFAULT_LEGEND
+    items = theme.get("legend") or graph.legend or DEFAULT_LEGEND
     widths = [len(it["label"]) * 14 + 40 for it in items]
     total = sum(widths) - 16
     start_x = (svg_w - total) / 2
@@ -634,9 +653,6 @@ def _render_legend(graph: Graph, svg_w: float, theme: dict[str, Any]) -> str:
     for it, w in zip(items, widths):
         fill = it["fill"]
         stroke = it["stroke"]
-        if theme.get("node_alpha_darken"):
-            fill = _darken_color(fill, 0.35)
-            stroke = _darken_color(stroke, 0.6)
         parts.append(f'  <rect x="{cur}" y="{y}" width="16" height="12" rx="3" fill="{fill}" stroke="{stroke}" stroke-width="0.5"/>')
         parts.append(f'  <text class="ts" x="{cur + 20}" y="{y + 6}" dominant-baseline="central">{_xml_escape(it["label"])}</text>')
         cur += w
@@ -659,24 +675,11 @@ def _update_viewbox(graph: Graph) -> tuple[float, float, float, float]:
     return min_x, 0, max_x - min_x, max_y + pad_top
 
 
-def _darken_color(hex_color: str, factor: float = 0.6) -> str:
-    """把 hex 颜色变暗（用于暗色主题节点填充）。"""
-    h = hex_color.lstrip("#")
-    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    r = int(r * factor)
-    g = int(g * factor)
-    b = int(b * factor)
-    return f"#{r:02x}{g:02x}{b:02x}"
-
-
 def _node_colors(n: Node, theme: dict[str, Any]) -> tuple[str, str]:
-    """返回 (fill, stroke)，暗色主题下变暗。"""
-    colors = ROLE_COLORS.get(n.role, ROLE_COLORS["ai"])
-    fill, stroke = colors["fill"], colors["stroke"]
-    if theme.get("node_alpha_darken"):
-        fill = _darken_color(fill, 0.35)
-        stroke = _darken_color(stroke, 0.6)
-    return fill, stroke
+    """返回 (fill, stroke)。暗色主题用独立配色表。"""
+    role_colors = theme.get("role_colors") or ROLE_COLORS
+    colors = role_colors.get(n.role, role_colors.get("ai", ROLE_COLORS["ai"]))
+    return colors["fill"], colors["stroke"]
 
 
 def render_svg(graph: Graph, theme: dict[str, Any]) -> str:
