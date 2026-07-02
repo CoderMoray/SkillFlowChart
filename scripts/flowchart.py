@@ -553,13 +553,18 @@ def _edge_geometry(graph: Graph, e: Edge) -> dict[str, Any]:
         return {"type": "fork", "x1": sx, "y1": sy, "x2": ex, "y2": ey, "lx": lx, "ly": ly}
 
     # 默认：垂直连线（主流程向下）
+    # 但如果 src.cx != dst.cx，转为折线（垂直→水平→垂直），避免斜线
     sx = src.cx
     sy = src.cy + (src.height / 2 if src.type != "decision" else DIAMOND_HALF_H)
     ex = dst.cx
     ey = dst.cy - (dst.height / 2 if dst.type != "decision" else DIAMOND_HALF_H)
-    lx = sx
+    lx = (sx + ex) / 2
     ly = (sy + ey) / 2 - 6
-    return {"type": "vertical", "x1": sx, "y1": sy, "x2": ex, "y2": ey, "lx": lx, "ly": ly}
+    if abs(sx - ex) < 1:
+        return {"type": "vertical", "x1": sx, "y1": sy, "x2": ex, "y2": ey, "lx": lx, "ly": ly}
+    else:
+        # cx 偏移 → 折线路由，同 fork 处理
+        return {"type": "fork", "x1": sx, "y1": sy, "x2": ex, "y2": ey, "lx": lx, "ly": ly}
 
 
 def _render_edge(graph: Graph, e: Edge, theme: dict[str, Any]) -> str:
