@@ -691,6 +691,49 @@ def _render_convergence(graph: Graph, theme: dict[str, Any]) -> list[str]:
     return parts
 
 
+def _render_loops(graph: Graph, theme: dict[str, Any]) -> list[str]:
+    """回环虚线：从 src 左侧出发，沿图左边缘向上走到 dst 左侧。
+
+    路由：src 左中 → (left_margin, src.cy) → (left_margin, dst.cy) → dst 左中
+    全部虚线，最后一段带箭头。
+    """
+    parts: list[str] = []
+    if not graph.loops:
+        return parts
+
+    # 计算图左边缘 x（所有节点最左再减 margin）
+    all_left = [n.cx - n.width / 2 for n in graph.nodes.values()]
+    left_margin = min(all_left) - 30
+
+    for lp in graph.loops:
+        src = graph.nodes.get(lp.from_id)
+        dst = graph.nodes.get(lp.to_id)
+        if not src or not dst:
+            continue
+
+        # src 左中点
+        sx = src.cx - src.width / 2
+        sy = src.cy
+        # dst 左中点
+        dx = dst.cx - dst.width / 2
+        dy = dst.cy
+
+        # 水平段：src 左中 → 左边缘
+        parts.append(f'  <line class="edge-dash" x1="{sx}" y1="{sy}" x2="{left_margin}" y2="{sy}"/>')
+        # 垂直段：左边缘上行/下行
+        parts.append(f'  <line class="edge-dash" x1="{left_margin}" y1="{sy}" x2="{left_margin}" y2="{dy}"/>')
+        # 水平段：左边缘 → dst 左中（带箭头）
+        parts.append(f'  <line class="edge-dash" x1="{left_margin}" y1="{dy}" x2="{dx}" y2="{dy}" marker-end="url(#arrow)"/>')
+
+        # 标签（在垂直段左侧）
+        if lp.label:
+            lx = left_margin - 6
+            ly = (sy + dy) / 2
+            parts.append(f'  <text class="ts" text-anchor="end" x="{lx}" y="{ly}">{lp.label}</text>')
+
+    return parts
+
+
 def _render_legend(graph: Graph, svg_x: float, svg_w: float, theme: dict[str, Any]) -> str:
     items = theme.get("legend") or graph.legend or DEFAULT_LEGEND
     # 每个图例项：色块内放文本，宽度根据文本长度估算
@@ -728,6 +771,11 @@ def _update_viewbox(graph: Graph) -> tuple[float, float, float, float]:
     pad_top = 24
     # 底部留白：主图底部到图例分隔线 64 + 标题 24 + 色块 24 + 底部 padding 20
     pad_bottom = 64 + 24 + 24 + 20
+    # 左侧留白：如果有 loop，需要容纳左边缘路由 + 标签文字（~80px）
+    if graph.loops:
+        all_left = [n.cx - n.width / 2 for n in graph.nodes.values()]
+        loop_left = min(all_left) - 30 - 80  # left_margin - label_width
+        pad_x = max(pad_x, min(xs) - loop_left)
     min_x = min(xs) - pad_x
     max_x = max(xs) + pad_x
     max_y = max(ys) + pad_bottom
@@ -790,6 +838,8 @@ def render_svg(graph: Graph, theme: dict[str, Any]) -> str:
         parts.append(_render_edge(graph, e, theme))
     # 汇合三段
     parts.extend(_render_convergence(graph, theme))
+    # 回环（虚线，沿左边缘）
+    parts.extend(_render_loops(graph, theme))
     # 节点
     for n in graph.nodes.values():
         parts.append(_render_node(n, theme))
