@@ -30,8 +30,7 @@
     {"from": "report",          "to": "fix_decision",     "label": "",     "side": "bottom"},
     {"from": "fix_decision",    "to": "output",          "label": "不修",   "side": "left"},
     {"from": "fix_decision",    "to": "fix_plan",         "label": "修",     "side": "bottom"},
-    {"from": "fix_plan",        "to": "apply_fix",        "label": "",     "side": "bottom"},
-    {"from": "apply_fix",       "to": "output",          "label": "",     "side": "bottom"}
+    {"from": "fix_plan",        "to": "apply_fix",        "label": "",     "side": "bottom"}
   ],
   "branches": [],
   "loops": [
