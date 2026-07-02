@@ -476,6 +476,30 @@ def _assign_x(graph: Graph) -> None:
                 # 入口/孤立
                 n.cx = CENTER_X
 
+    # 防御：同层节点 cx 重叠时自动错开
+    for lvl in sorted(by_level.keys()):
+        ns = by_level[lvl]
+        used_cx: list[float] = []
+        for n in sorted(ns, key=lambda x: x.cx):
+            # 检查是否与已放置的节点 cx 重叠（且宽度会碰）
+            overlap = False
+            for ucx in used_cx:
+                if abs(n.cx - ucx) < (n.width / 2 + 60):  # 60 = 最小半宽估算
+                    overlap = True
+                    break
+            if overlap:
+                # 找一个不重叠的位置
+                for trial in [SIDE_LEFT_X, FORK_LEFT_X, CENTER_X, FORK_RIGHT_X, SIDE_RIGHT_X]:
+                    ok = True
+                    for ucx in used_cx:
+                        if abs(trial - ucx) < (n.width / 2 + 60):
+                            ok = False
+                            break
+                    if ok:
+                        n.cx = trial
+                        break
+            used_cx.append(n.cx)
+
 
 # ---------------------------------------------------------------------------
 # 渲染

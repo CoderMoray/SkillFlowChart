@@ -9,8 +9,8 @@
   ],
   "edges": [
     {"from": "entry", "to": "check"},
-    {"from": "check", "to": "exit", "label": "否"},
-    {"from": "check", "to": "do", "label": "是"},
+    {"from": "check", "to": "exit", "label": "否", "side": "left"},
+    {"from": "check", "to": "do", "label": "是", "side": "bottom"},
     {"from": "do", "to": "end"}
   ],
   "branches": [],
