@@ -883,11 +883,36 @@ def main() -> None:
     parser.add_argument("--json-out", default="", help="输出布局后 JSON 路径（调试用）")
     args = parser.parse_args()
 
-    theme = THEMES[args.theme]
-    graph = load_graph(args.nodes_json)
-    layout(graph)
+    try:
+        theme = THEMES[args.theme]
+        graph = load_graph(args.nodes_json)
+        layout(graph)
+    except FileNotFoundError:
+        print(f"[错误] 找不到文件: {args.nodes_json}")
+        print(f"  请检查路径是否正确。例如: python3 scripts/flowchart.py docs/my-nodes.json")
+        return
+    except json.JSONDecodeError as exc:
+        print(f"[错误] JSON 格式不正确: {args.nodes_json}")
+        print(f"  第 {exc.lineno} 行, 第 {exc.colno} 列: {exc.msg}")
+        print(f"  请检查 JSON 是否有缺少逗号、多余逗号、或括号不匹配的问题")
+        return
+    except ValueError as exc:
+        print(f"[错误] nodes.json 数据校验失败")
+        print(f"  {exc}")
+        print(f"  请对照 SKILL.md 的 schema 检查节点/边/回环的定义")
+        return
+    except Exception as exc:
+        print(f"[错误] 未知异常: {type(exc).__name__}: {exc}")
+        print(f"  请将完整错误信息反馈给开发者")
+        return
 
-    html = render_html(graph, theme)
+    try:
+        html = render_html(graph, theme)
+    except Exception as exc:
+        print(f"[错误] 渲染失败: {type(exc).__name__}: {exc}")
+        print(f"  这通常是脚本 bug，请检查 nodes.json 的节点/边关系是否有循环引用")
+        return
+
     with open(args.out, "w", encoding="utf-8") as f:
         f.write(html)
     print(f"[完成] 节点: {len(graph.nodes)}, 边: {len(graph.edges)}, 主题: {args.theme}")

@@ -149,3 +149,16 @@ python3 <skill_dir>/scripts/flowchart.py <nodes.json> --out docs/decision-flowch
 - [ ] 回环用 loops 字段，不在 edges 里重复
 - [ ] 所有节点 id 在 edges 的 from/to 中都被引用（无孤立节点）
 - [ ] 图例留空 `[]`
+
+## 常见问题
+
+**Q: 节点重叠了怎么办？**
+检查是否缺少 `side` 字段。决策分支必须有 side（left/right/bottom），否则两个目标节点会继承同一位置。
+
+**Q: 回环虚线没有画出来？**
+回环用 `loops` 数组声明（不是 edges），且 from/to 不要在 edges 里重复。`path` 固定为 `"left_edge"`。
+
+**Q: 脚本报 JSON 格式错误？**
+JSON 不支持注释和单引号。常见问题：缺少逗号、多余逗号（数组末尾）、单引号。
+
+更多问题参见 [`docs/FAQ.md`](docs/FAQ.md)。
