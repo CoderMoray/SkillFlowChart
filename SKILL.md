@@ -1,6 +1,6 @@
 ---
 name: skill-flowchart
-description: "Reads a SKILL.md and generates a decision flowchart HTML. Invoke when user asks to visualize a Skill's execution flow or wants a decision tree diagram from a SKILL.md file."
+description: "生成技能流程图、决策树、工作流图。读取 SKILL.md 或技能定义文件，提取决策节点与执行步骤，输出自包含 HTML 流程图（SVG，零依赖）。适用于可视化 Skill 执行流程、画决策树、生成 agent skill 的 decision flow diagram、流程可视化。Reads a SKILL.md and generates a decision flowchart HTML."
 ---
 
 # Skill 决策流程图生成器
