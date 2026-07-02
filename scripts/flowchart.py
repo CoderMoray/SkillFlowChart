@@ -725,11 +725,11 @@ def _render_loops(graph: Graph, theme: dict[str, Any]) -> list[str]:
         # 水平段：左边缘 → dst 左中（带箭头）
         parts.append(f'  <line class="edge-dash" x1="{left_margin}" y1="{dy}" x2="{dx}" y2="{dy}" marker-end="url(#arrow)"/>')
 
-        # 标签（在垂直段左侧）
+        # 标签（在垂直段右侧，text-anchor=start 避免截断）
         if lp.label:
-            lx = left_margin - 6
+            lx = left_margin + 6
             ly = (sy + dy) / 2
-            parts.append(f'  <text class="ts" text-anchor="end" x="{lx}" y="{ly}">{lp.label}</text>')
+            parts.append(f'  <text class="ts" text-anchor="start" x="{lx}" y="{ly}">{lp.label}</text>')
 
     return parts
 
