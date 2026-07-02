@@ -76,9 +76,22 @@ AI 只输出结构化数据，**绝不**输出坐标或 SVG；脚本只做几何
 
 #### loops（回环，可选，虚线）
 
+当流程中存在「回到先前步骤」的逻辑时使用，例如：
+- 修复后重新审查（`apply_fix → entry`）
+- 重试（`retry → 检查点`）
+- 循环直到满足条件（`recheck → validate`）
+
 ```json
-{ "from": "fix_done", "to": "entry", "label": "重新审查", "path": "left_edge" }
+{ "from": "apply_fix", "to": "entry", "label": "修复后重新审查", "path": "left_edge" }
 ```
+
+字段说明：
+- `from`：回环起点节点 id（通常是最后一步）
+- `to`：回环终点节点 id（通常是流程起点或某个检查点）
+- `label`：回环标签，显示在虚线旁
+- `path`：固定为 `"left_edge"`（沿图左边缘路由）
+
+**注意**：回环起点到终点之间**不要**在 edges 里重复画边，否则会重复渲染。
 
 #### legend
 
