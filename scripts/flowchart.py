@@ -529,18 +529,21 @@ def _edge_geometry(graph: Graph, e: Edge) -> dict[str, Any]:
     if src.type == "decision" and e.side in ("left", "right"):
         sx = src.cx + (-DIAMOND_HALF_W if e.side == "left" else DIAMOND_HALF_W)
         sy = src.cy
-        ex = dst.cx + (dst.width / 2 if e.side == "left" else -dst.width / 2)
-        ey = dst.cy
-        lx = (sx + ex) / 2
-        ly = sy - 8
-        # 防御：如果 cy 不一致（侧支目标不在同层），转折线
-        if abs(sy - ey) < 1:
+        # 到达端点始终是标准连接点（A4/C6）：同层→侧边中点，跨层→上中点
+        if abs(src.cy - dst.cy) < 1:
+            # 同层水平连线：到达 dst 侧边中点
+            ex = dst.cx + (dst.width / 2 if e.side == "left" else -dst.width / 2)
+            ey = dst.cy
+            lx = (sx + ex) / 2
+            ly = sy - 8
             return {"type": "horizontal", "x1": sx, "y1": sy, "x2": ex, "y2": ey, "lx": lx, "ly": ly}
         else:
-            # 从菱形顶点出发，走折线到目标
+            # 跨层：从菱形下顶点出发，折线到 dst 上中点
             sx2 = src.cx
-            sy2 = src.cy + DIAMOND_HALF_H  # 菱形底部
-            return {"type": "fork", "x1": sx2, "y1": sy2, "x2": ex, "y2": ey - dst.height/2, "lx": (sx2+ex)/2, "ly": (sy2+ey)/2-6}
+            sy2 = src.cy + DIAMOND_HALF_H
+            ex2 = dst.cx
+            ey2 = dst.cy - (dst.height / 2 if dst.type != "decision" else DIAMOND_HALF_H)
+            return {"type": "fork", "x1": sx2, "y1": sy2, "x2": ex2, "y2": ey2, "lx": (sx2 + ex2) / 2, "ly": (sy2 + ey2) / 2 - 6}
 
     # 普通分叉（src 不是决策，side=left/right）：折线，不画斜线
     if src.type != "decision" and e.side in ("left", "right"):
@@ -606,7 +609,8 @@ def _render_edge(graph: Graph, e: Edge, theme: dict[str, Any]) -> str:
 def _render_convergence(graph: Graph, theme: dict[str, Any]) -> list[str]:
     """汇合点：多条入边画成「垂直→水平→垂直」三段。
 
-    仅对入边 ≥2 且入边来自不同 x 的节点处理。
+    触发条件（D5）：入边 ≥ 2 且存在不同路径（来源 cx 不同 或 side 不同）。
+    当 src cx 相同但 side 不同时，各入边的垂直段终点 x 用各自的 fork 路由终点。
     """
     in_edges: dict[str, list[Edge]] = {nid: [] for nid in graph.nodes}
     for e in graph.edges:
@@ -617,23 +621,40 @@ def _render_convergence(graph: Graph, theme: dict[str, Any]) -> list[str]:
         if len(ins) < 2:
             continue
         dst = graph.nodes[nid]
-        # 检查入边是否来自不同 x
+        # 检查入边是否来自不同路径（不同 cx 或不同 side）
         srcs = [graph.nodes[e.from_id] for e in ins if e.from_id in graph.nodes]
-        xs = {s.cx for s in srcs}
-        if len(xs) <= 1:
-            continue  # 同 x 不需要汇合三段
+        paths = {(s.cx, e.side) for s, e in zip(srcs, ins) if s.id != nid}
+        if len(paths) <= 1:
+            continue  # 完全相同路径，不需要汇合三段
         # 汇合 y：dst 顶部上方一点
         dst_top = dst.cy - (dst.height / 2 if dst.type != "decision" else DIAMOND_HALF_H)
         mid_y = dst_top - 20
-        # 每个 src 底部 → mid_y（垂直）
-        for s in srcs:
+        # 每个 src 底部 → mid_y（垂直段，需要水平偏移时走折线）
+        # 终点 x 取决于该边的 fork 路由：cx 不一致时用 dst.cx，一致时用 src.cx
+        end_xs = []
+        for s, e in zip(srcs, ins):
             sx = s.cx
             sy = s.cy + (s.height / 2 if s.type != "decision" else DIAMOND_HALF_H)
-            parts.append(f'  <line class="edge" x1="{sx}" y1="{sy}" x2="{sx}" y2="{mid_y}"/>')
-        # 水平线
-        left_x = min(s.cx for s in srcs)
-        right_x = max(s.cx for s in srcs)
-        parts.append(f'  <line class="edge" x1="{left_x}" y1="{mid_y}" x2="{right_x}" y2="{mid_y}"/>')
+            # 如果这条边需要水平偏移（src.cx != dst.cx），垂直段终点用 dst.cx
+            if abs(s.cx - dst.cx) < 1 and e.side in ("left", "right"):
+                ex = dst.cx  # 侧支折到 dst cx
+            elif abs(s.cx - dst.cx) < 1:
+                ex = s.cx  # 同 cx bottom
+            else:
+                ex = dst.cx  # 不同 cx，折到 dst cx
+            if abs(sx - ex) < 1:
+                # 同 x：垂直线
+                parts.append(f'  <line class="edge" x1="{sx}" y1="{sy}" x2="{ex}" y2="{mid_y}"/>')
+                end_xs.append(ex)
+            else:
+                # 不同 x：折线（先垂直到 mid_y 再水平），不画斜线
+                parts.append(f'  <line class="edge" x1="{sx}" y1="{sy}" x2="{sx}" y2="{mid_y}"/>')
+                end_xs.append(sx)  # 垂直段终点是 sx，水平线从 sx 连到 dst.cx
+        # 水平线（连接所有终点 x）
+        left_x = min(end_xs)
+        right_x = max(end_xs)
+        if abs(left_x - right_x) >= 1:
+            parts.append(f'  <line class="edge" x1="{left_x}" y1="{mid_y}" x2="{right_x}" y2="{mid_y}"/>')
         # 汇合点 → dst 顶部（垂直，带箭头）
         parts.append(f'  <line class="edge" x1="{dst.cx}" y1="{mid_y}" x2="{dst.cx}" y2="{dst_top}" marker-end="url(#arrow)"/>')
     return parts
@@ -717,6 +738,7 @@ def render_svg(graph: Graph, theme: dict[str, Any]) -> str:
     parts.append('  </style>')
 
     # 识别汇合点入边（由汇合三段接管，普通渲染跳过）
+    # 条件同 _render_convergence：入边 ≥ 2 且存在不同路径（cx 或 side 不同）
     in_edges_map: dict[str, list[Edge]] = {nid: [] for nid in graph.nodes}
     for e in graph.edges:
         in_edges_map[e.to_id].append(e)
@@ -725,8 +747,8 @@ def render_svg(graph: Graph, theme: dict[str, Any]) -> str:
         if len(ins) < 2:
             continue
         srcs = [graph.nodes[e.from_id] for e in ins if e.from_id in graph.nodes]
-        xs = {s.cx for s in srcs}
-        if len(xs) > 1:
+        paths = {(s.cx, e.side) for s, e in zip(srcs, ins) if s.id != nid}
+        if len(paths) > 1:
             for e in ins:
                 convergence_edges.add(id(e))
 
