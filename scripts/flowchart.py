@@ -451,11 +451,18 @@ def _assign_x(graph: Graph) -> None:
                 if n.cx != 0.0:
                     continue
                 ins = in_edges[n.id]
-                # 优先 side 标记
+                # 优先级 1：汇合点（入边 ≥ 2 且来源路径不同）→ cx = CENTER_X
+                # 路径不同 = 来源 cx 不同 或 side 不同
+                if len(ins) >= 2:
+                    srcs_done = [(graph.nodes[e.from_id], e) for e in ins if e.from_id in graph.nodes]
+                    paths = {(s.cx, e.side) for s, e in srcs_done if s.cx != 0.0}
+                    if len(paths) > 1:
+                        n.cx = CENTER_X
+                        continue
+                # 优先级 2：side 标记（决策侧支 / 普通分叉）
                 for e in ins:
                     if e.side in ("left", "right"):
                         src = graph.nodes.get(e.from_id)
-                        # 决策侧支 → 侧支 x；普通分叉 → 分叉 x
                         if src and src.type == "decision":
                             n.cx = SIDE_LEFT_X if e.side == "left" else SIDE_RIGHT_X
                         else:
@@ -463,16 +470,16 @@ def _assign_x(graph: Graph) -> None:
                         break
                 if n.cx != 0.0:
                     continue
-                # 汇合点
-                if len(ins) >= 2:
-                    n.cx = CENTER_X
-                    continue
-                # 单入边且无 side：继承上游
+                # 优先级 3：单入边继承上游
                 if len(ins) == 1:
                     up = ins[0].from_id
                     if up in graph.nodes and graph.nodes[up].cx != 0.0:
                         n.cx = graph.nodes[up].cx
                         continue
+                # 优先级 4：同层多入边但来源 cx 相同 → 也放中心
+                if len(ins) >= 2:
+                    n.cx = CENTER_X
+                    continue
                 # 入口/孤立
                 n.cx = CENTER_X
 
