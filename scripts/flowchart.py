@@ -527,19 +527,20 @@ def _edge_geometry(graph: Graph, e: Edge) -> dict[str, Any]:
 
     # 决策侧支：水平连线（src 是菱形，side=left/right）
     if src.type == "decision" and e.side in ("left", "right"):
-        if e.side == "left":
-            sx = src.cx - DIAMOND_HALF_W
-        else:
-            sx = src.cx + DIAMOND_HALF_W
+        sx = src.cx + (-DIAMOND_HALF_W if e.side == "left" else DIAMOND_HALF_W)
         sy = src.cy
-        if e.side == "left":
-            ex = dst.cx + dst.width / 2
-        else:
-            ex = dst.cx - dst.width / 2
+        ex = dst.cx + (dst.width / 2 if e.side == "left" else -dst.width / 2)
         ey = dst.cy
         lx = (sx + ex) / 2
         ly = sy - 8
-        return {"type": "horizontal", "x1": sx, "y1": sy, "x2": ex, "y2": ey, "lx": lx, "ly": ly}
+        # 防御：如果 cy 不一致（侧支目标不在同层），转折线
+        if abs(sy - ey) < 1:
+            return {"type": "horizontal", "x1": sx, "y1": sy, "x2": ex, "y2": ey, "lx": lx, "ly": ly}
+        else:
+            # 从菱形顶点出发，走折线到目标
+            sx2 = src.cx
+            sy2 = src.cy + DIAMOND_HALF_H  # 菱形底部
+            return {"type": "fork", "x1": sx2, "y1": sy2, "x2": ex, "y2": ey - dst.height/2, "lx": (sx2+ex)/2, "ly": (sy2+ey)/2-6}
 
     # 普通分叉（src 不是决策，side=left/right）：折线，不画斜线
     if src.type != "decision" and e.side in ("left", "right"):
