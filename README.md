@@ -2,6 +2,8 @@
 
 > Turn any `SKILL.md` into a self-contained decision flowchart HTML.
 
+**English** | [中文](README.cn.md)
+
 SkillFlowChart generates clean, deterministic decision flowcharts from natural-language skill definitions. It splits the work where each side excels: **AI extracts semantics, a script computes geometry** — so every render of the same input is pixel-identical.
 
 ## Table of Contents
@@ -131,27 +133,41 @@ python3 scripts/flowchart.py nodes.json --theme dark --out dark.html
 
 ## Examples
 
-See `docs/halucatch-nodes.json` for a complete real-world example, and the generated outputs:
+### HaluCatch (Hallucination Detection)
+
+A complete real-world example with multi-level decisions, side-branch convergence, and multi-role nodes.
 
 - [Light theme](docs/halucatch-light.html)
 - [Dark theme](docs/halucatch-dark.html)
 - [Transparent theme](docs/halucatch-transparent.html)
 
+### TRAE Security Review
+
+17 nodes, 18 edges. Contains 4 decision points, 2 side-branch convergences, and 2 termination drops.
+
+- [Light theme](docs/security-review-light.html)
+- [Dark theme](docs/security-review-dark.html)
+
 ## Project Structure
 
 ```
 SkillFlowChart/
-├── SKILL.md                # Skill definition (AI entry point + extraction rules)
+├── README.md                          # English documentation
+├── README.cn.md                       # 中文说明
+├── SKILL.md                           # Skill definition (AI entry point + extraction rules)
 ├── scripts/
-│   └── flowchart.py        # Core: nodes.json → SVG + HTML
+│   └── flowchart.py                   # Core: nodes.json → SVG + HTML
 ├── docs/
-│   ├── halucatch-nodes.json        # Example input
-│   ├── halucatch-light.html        # Example output (light)
-│   ├── halucatch-dark.html         # Example output (dark)
-│   └── halucatch-transparent.html  # Example output (transparent)
+│   ├── halucatch-nodes.json           # Example input (HaluCatch)
+│   ├── halucatch-light.html           # Example output (light)
+│   ├── halucatch-dark.html            # Example output (dark)
+│   ├── halucatch-transparent.html     # Example output (transparent)
+│   ├── security-review-nodes.json     # Example input (Security Review)
+│   ├── security-review-light.html     # Example output (light)
+│   └── security-review-dark.html      # Example output (dark)
 ├── tests/
-│   └── simple.json         # Minimal test case
-└── README.md
+│   └── simple.json                    # Minimal test case
+└── LICENSE
 ```
 
 ## Design Principles
