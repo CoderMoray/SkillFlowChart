@@ -156,13 +156,6 @@ class Edge:
 
 
 @dataclass
-class Branch:
-    from_id: str
-    items: list[dict[str, Any]]
-    converge_to: str
-
-
-@dataclass
 class Loop:
     from_id: str
     to_id: str
@@ -176,7 +169,6 @@ class Graph:
     subtitle: str = ""
     nodes: dict[str, Node] = field(default_factory=dict)
     edges: list[Edge] = field(default_factory=list)
-    branches: list[Branch] = field(default_factory=list)
     loops: list[Loop] = field(default_factory=list)
     legend: list[dict[str, str]] = field(default_factory=list)
 
@@ -237,13 +229,6 @@ def load_graph(json_path: str) -> Graph:
             side=e.get("side", ""),
         ))
 
-    for b in data.get("branches", []):
-        graph.branches.append(Branch(
-            from_id=b["from"],
-            items=b.get("items", []),
-            converge_to=b.get("converge_to", ""),
-        ))
-
     for l in data.get("loops", []):
         graph.loops.append(Loop(
             from_id=l["from"],
@@ -272,12 +257,6 @@ def _validate_graph(graph: Graph) -> None:
             raise ValueError(f"Edge to 引用了未知节点 id: '{e.to_id}'。有效: {sorted(valid_ids)}")
         if e.side not in VALID_SIDES:
             raise ValueError(f"Edge {e.from_id}->{e.to_id} side 非法: '{e.side}'，合法: {sorted(VALID_SIDES)}")
-    # 分支/回环引用校验
-    for b in graph.branches:
-        if b.from_id not in valid_ids:
-            raise ValueError(f"Branch from 引用了未知节点 id: '{b.from_id}'")
-        if b.converge_to not in valid_ids:
-            raise ValueError(f"Branch converge_to 引用了未知节点 id: '{b.converge_to}'")
     for l in graph.loops:
         if l.from_id not in valid_ids:
             raise ValueError(f"Loop from 引用了未知节点 id: '{l.from_id}'")

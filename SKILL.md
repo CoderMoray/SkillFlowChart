@@ -34,7 +34,6 @@ AI 只输出结构化数据，**绝不**输出坐标或 SVG；脚本只做几何
   "subtitle": "可选描述",
   "nodes": [ ... ],
   "edges": [ ... ],
-  "branches": [ ... ],
   "loops": [ ... ],
   "legend": [ ... ]
 }
@@ -42,7 +41,6 @@ AI 只输出结构化数据，**绝不**输出坐标或 SVG；脚本只做几何
 
 - `nodes`：必填，节点数组
 - `edges`：必填，有向边数组
-- `branches`：可选，一对多分叉（见下文）
 - `loops`：可选，回环虚线（见下文）
 - `legend`：通常留空 `[]`，使用默认图例
 
@@ -79,23 +77,6 @@ AI 只输出结构化数据，**绝不**输出坐标或 SVG；脚本只做几何
 **side 的语义判断由 AI 完成**：
 - 决策菱形（type=decision）的 `left`/`right` → 与决策**同层**，水平连线
 - 普通矩形（type=process/output）的 `left`/`right` → **下一层**，正交折线（垂直→水平→垂直，无斜线）
-
-#### branches（一对多分叉 → 汇合，可选）
-
-当一个决策产生 2+ 个平行处理分支，最终汇合到同一个节点时使用：
-
-```json
-{
-  "from": "classify",
-  "items": [
-    { "id": "type_a", "label": "类型A", "role": "ai" },
-    { "id": "type_b", "label": "类型B", "role": "ai" }
-  ],
-  "converge_to": "evaluate"
-}
-```
-
-> **branches 会自动生成节点和边**，不需要在 nodes/edges 里重复声明。
 
 #### loops（回环，可选，虚线）
 
