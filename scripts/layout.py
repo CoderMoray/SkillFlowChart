@@ -179,8 +179,24 @@ def _classify_node(node: Node, in_edges: dict[str, list[Edge]],
             | 'center' | 'inherit'
     """
     ins = in_edges[node.id]
-    # 汇合点（入边 >= 2 且来源路径不同）→ center
+    # 汇合点（入边 >= 2 且来源节点不同）→ center
     if len(ins) >= 2:
+        sources = {e.from_id for e in ins}
+        if len(sources) >= 2:
+            return "center"
+        # 同一来源的多条入边：如果有 bottom 和 side(left/right) 混合，
+        # 按 side 归类（让 fork 有水平段）
+        has_bottom = any(e.side in ("bottom", "") for e in ins)
+        has_side = any(e.side in ("left", "right") for e in ins)
+        if has_bottom and has_side:
+            for e in ins:
+                if e.side in ("left", "right"):
+                    src = graph.nodes.get(e.from_id)
+                    if src and src.type == "decision":
+                        return "side_left" if e.side == "left" else "side_right"
+                    else:
+                        return "fork_left" if e.side == "left" else "fork_right"
+        # 纯 bottom 或纯 side → center
         return "center"
     # side 标记
     for e in ins:

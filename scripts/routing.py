@@ -203,21 +203,27 @@ def _render_convergence(graph: Graph, theme: dict[str, Any]) -> list[str]:
                 ex = dst.cx
             entries.append((ex, sy, e))
 
-        # 每个 src 底部 → mid_y（垂直段）
+        # 每个 src 底部 → mid_y（垂直段，终点为 end_x）
         end_xs: list[float] = []
         for ex, sy, e in entries:
             sx = graph.nodes[e.from_id].cx
+            # 垂直段：先从 src 底部垂直到 mid_y
             parts.append(f'  <line class="edge" x1="{sx}" y1="{sy}" x2="{sx}" y2="{mid_y}"/>')
-            end_xs.append(sx)
+            # 如果 end_x ≠ src.cx，需要水平段从 src.cx 到 end_x
+            if abs(ex - sx) >= 1:
+                parts.append(f'  <line class="edge" x1="{sx}" y1="{mid_y}" x2="{ex}" y2="{mid_y}"/>')
+            end_xs.append(ex)
 
-        # 水平线（连接所有终点 x）
+        # 水平线（连接所有 end_xs）
         left_x = min(end_xs)
         right_x = max(end_xs)
         if abs(left_x - right_x) >= 1:
             parts.append(f'  <line class="edge" x1="{left_x}" y1="{mid_y}" x2="{right_x}" y2="{mid_y}"/>')
 
         # 汇合点 → dst 顶部（垂直，带箭头）
-        parts.append(f'  <line class="edge" x1="{dst.cx}" y1="{mid_y}" x2="{dst.cx}" y2="{dst_top}" marker-end="url(#arrow)"/>')
+        # x 取 end_xs 的中心位置，如果 end_xs 包含 dst.cx 则用 dst.cx
+        merge_x = dst.cx if any(abs(ex - dst.cx) < 1 for ex in end_xs) else (left_x + right_x) / 2
+        parts.append(f'  <line class="edge" x1="{merge_x}" y1="{mid_y}" x2="{merge_x}" y2="{dst_top}" marker-end="url(#arrow)"/>')
 
     return parts
 
