@@ -293,14 +293,16 @@ def _assign_depth(graph: Graph) -> None:
     for nid in graph.nodes:
         depth.setdefault(nid, 0)
 
-    # 决策节点的侧支 target：与决策同 level
-    # （仅对 from.type == decision 且 side in (left,right) 生效）
+    # 决策节点的侧支 target：与决策同 level（仅当目标也是 decision 时）
+    # 目标是 process/output/terminal 时，仍是下一层（bottom 语义）
     side_targets: set[str] = set()   # 与决策同层的侧支
     for nid, node in graph.nodes.items():
         if node.type == "decision":
             for e in out_edges[nid]:
                 if e.side in ("left", "right") and e.to_id in graph.nodes:
-                    side_targets.add(e.to_id)
+                    target_node = graph.nodes[e.to_id]
+                    if target_node.type == "decision":
+                        side_targets.add(e.to_id)
 
     # 汇合点：入边 ≥ 2
     convergence: set[str] = {
@@ -463,28 +465,32 @@ def _assign_x(graph: Graph) -> None:
                 n.cx = CENTER_X
 
     # 防御：同层节点 cx 重叠时自动错开
+    # 预先收集已放置节点的 (cx, half_width) 用于精确碰撞检测
     for lvl in sorted(by_level.keys()):
         ns = by_level[lvl]
-        used_cx: list[float] = []
+        placed: list[tuple[float, float]] = []  # (cx, half_width)
         for n in sorted(ns, key=lambda x: x.cx):
-            # 检查是否与已放置的节点 cx 重叠（且宽度会碰）
             overlap = False
-            for ucx in used_cx:
-                if abs(n.cx - ucx) < (n.width / 2 + 60):  # 60 = 最小半宽估算
+            for pcx, phw in placed:
+                if abs(n.cx - pcx) < (n.width / 2 + phw + 8):  # 8px 最小间距
                     overlap = True
                     break
             if overlap:
                 # 找一个不重叠的位置
                 for trial in [SIDE_LEFT_X, FORK_LEFT_X, CENTER_X, FORK_RIGHT_X, SIDE_RIGHT_X]:
                     ok = True
-                    for ucx in used_cx:
-                        if abs(trial - ucx) < (n.width / 2 + 60):
+                    for pcx, phw in placed:
+                        if abs(trial - pcx) < (n.width / 2 + phw + 8):
                             ok = False
                             break
                     if ok:
                         n.cx = trial
                         break
-            used_cx.append(n.cx)
+                else:
+                    # 所有 slot 都满：在已有节点右侧逐个外推
+                    max_right = max(pcx + phw for pcx, phw in placed) if placed else CENTER_X
+                    n.cx = max_right + n.width / 2 + 24  # 右侧外推
+            placed.append((n.cx, n.width / 2))
 
 
 # ---------------------------------------------------------------------------
