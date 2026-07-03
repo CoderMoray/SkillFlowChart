@@ -183,6 +183,10 @@ def _render_convergence(graph: Graph, theme: dict[str, Any]) -> list[str]:
         dst = graph.nodes[nid]
         srcs = [graph.nodes[e.from_id] for e in ins if e.from_id in graph.nodes]
         paths = {(s.cx, e.side) for s, e in zip(srcs, ins) if s.id != nid}
+        # 同一来源的多条入边不触发汇合
+        sources = {e.from_id for e in ins}
+        if len(sources) < 2:
+            continue
         if len(paths) <= 1:
             continue  # 完全相同路径，不需要汇合三段
 

@@ -140,6 +140,10 @@ def render_svg(graph: Graph, theme: dict[str, Any]) -> str:
             continue
         srcs = [graph.nodes[e.from_id] for e in ins if e.from_id in graph.nodes]
         paths = {(s.cx, e.side) for s, e in zip(srcs, ins) if s.id != nid}
+        # 同一来源的多条入边不触发汇合，让每条边独立渲染
+        sources = {e.from_id for e in ins}
+        if len(sources) < 2:
+            continue
         if len(paths) > 1:
             for e in ins:
                 convergence_edges.add(id(e))
