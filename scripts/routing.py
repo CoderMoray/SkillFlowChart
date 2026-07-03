@@ -27,6 +27,50 @@ def _segment_intersects_node(x1: float, x2: float, y: float, node: Node) -> bool
     return True
 
 
+def _vertical_segment_intersects_node(x: float, y1: float, y2: float, node: Node) -> bool:
+    """垂直段 (x,y1)→(x,y2) 是否穿过节点的边界框。"""
+    if x < node.cx - node.width / 2 or x > node.cx + node.width / 2:
+        return False  # x 不在节点范围内
+    y_min = min(y1, y2)
+    y_max = max(y1, y2)
+    if y_max < node.cy - node.height / 2 or y_min > node.cy + node.height / 2:
+        return False  # y 范围不重叠
+    return True
+
+
+def _side_route_x(graph: Graph, go_right: bool) -> float:
+    """计算侧面绕行的 x 坐标。"""
+    all_nodes = list(graph.nodes.values())
+    if go_right:
+        max_right = max(n.cx + n.width / 2 for n in all_nodes)
+        return max_right + 40
+    else:
+        min_left = min(n.cx - n.width / 2 for n in all_nodes)
+        return min_left - 40
+
+
+def _find_side_route_safe_y(x1: float, x2: float, y_start: float,
+                            nodes: list[Node], exclude_ids: set[str],
+                            direction: int = 1, step: float = 16.0,
+                            max_attempts: int = 30,
+                            upper_limit: float = 99999.0) -> float:
+    """为侧面绕行的水平段找到一个不穿过任何节点的 y 坐标。
+
+    direction=1 表示向下搜索，direction=-1 表示向上搜索。
+    """
+    left_x, right_x = min(x1, x2), max(x1, x2)
+    candidates = [n for n in nodes if n.id not in exclude_ids]
+    for i in range(1, max_attempts + 1):
+        try_y = y_start + direction * step * i
+        if direction > 0 and try_y > upper_limit:
+            break
+        if direction < 0 and try_y < 0:
+            break
+        if not any(_segment_intersects_node(left_x, right_x, try_y, n) for n in candidates):
+            return try_y
+    return y_start  # fallback
+
+
 def _find_avoidance_y(
     x1: float, x2: float, mid_y: float, nodes: list[Node],
     exclude_ids: set[str], lower_bound: float, upper_bound: float,
@@ -147,9 +191,48 @@ def _render_edge(graph: Graph, e: Edge, theme: dict[str, Any]) -> str:
             lower_bound=lower_bound,
             upper_bound=upper_bound,
         )
-        parts.append(f'  <line class="{edge_class}" x1="{g["x1"]}" y1="{g["y1"]}" x2="{g["x1"]}" y2="{mid_y}"/>')
-        parts.append(f'  <line class="{edge_class}" x1="{g["x1"]}" y1="{mid_y}" x2="{g["x2"]}" y2="{mid_y}"/>')
-        parts.append(f'  <line class="{edge_class}" x1="{g["x2"]}" y1="{mid_y}" x2="{g["x2"]}" y2="{g["y2"]}" marker-end="url(#arrow)"/>')
+        # 穿透检测：检查第一段和第三段垂直段是否穿过中间节点
+        candidates = [n for n in graph.nodes.values() if n.id not in (e.from_id, e.to_id)]
+        vert1_hit = any(_vertical_segment_intersects_node(g["x1"], g["y1"], mid_y, n) for n in candidates)
+        vert3_hit = any(_vertical_segment_intersects_node(g["x2"], mid_y, g["y2"], n) for n in candidates)
+
+        if vert1_hit or vert3_hit:
+            # 改用侧面绕行
+            go_right = g["x1"] <= g["x2"]
+            side_x = _side_route_x(graph, go_right)
+            # 为水平段找安全的 y 坐标
+            safe_y1 = _find_side_route_safe_y(
+                g["x1"], side_x, g["y1"],
+                list(graph.nodes.values()),
+                exclude_ids={e.from_id, e.to_id},
+                direction=1,
+                upper_bound=g["y2"],
+            )
+            safe_y2 = _find_side_route_safe_y(
+                side_x, g["x2"], g["y2"],
+                list(graph.nodes.values()),
+                exclude_ids={e.from_id, e.to_id},
+                direction=-1,
+            )
+            # 垂直向下到 safe_y1
+            if abs(safe_y1 - g["y1"]) >= 1:
+                parts.append(f'  <line class="{edge_class}" x1="{g["x1"]}" y1="{g["y1"]}" x2="{g["x1"]}" y2="{safe_y1}"/>')
+            # 水平到侧面
+            parts.append(f'  <line class="{edge_class}" x1="{g["x1"]}" y1="{safe_y1}" x2="{side_x}" y2="{safe_y1}"/>')
+            # 垂直到 safe_y2
+            parts.append(f'  <line class="{edge_class}" x1="{side_x}" y1="{safe_y1}" x2="{side_x}" y2="{safe_y2}"/>')
+            # 水平回到 dst
+            parts.append(f'  <line class="{edge_class}" x1="{side_x}" y1="{safe_y2}" x2="{g["x2"]}" y2="{safe_y2}"/>')
+            # 垂直到 dst 顶部
+            if abs(safe_y2 - g["y2"]) >= 1:
+                parts.append(f'  <line class="{edge_class}" x1="{g["x2"]}" y1="{safe_y2}" x2="{g["x2"]}" y2="{g["y2"]}" marker-end="url(#arrow)"/>')
+            else:
+                # safe_y2 == y2, 箭头加在水平段末尾
+                parts[-1] = parts[-1].replace('"/>', '" marker-end="url(#arrow)"/>')
+        else:
+            parts.append(f'  <line class="{edge_class}" x1="{g["x1"]}" y1="{g["y1"]}" x2="{g["x1"]}" y2="{mid_y}"/>')
+            parts.append(f'  <line class="{edge_class}" x1="{g["x1"]}" y1="{mid_y}" x2="{g["x2"]}" y2="{mid_y}"/>')
+            parts.append(f'  <line class="{edge_class}" x1="{g["x2"]}" y1="{mid_y}" x2="{g["x2"]}" y2="{g["y2"]}" marker-end="url(#arrow)"/>')
     else:
         line = f'  <line class="{edge_class}" x1="{g["x1"]}" y1="{g["y1"]}" x2="{g["x2"]}" y2="{g["y2"]}" marker-end="url(#arrow)"/>'
         parts.append(line)
@@ -216,7 +299,7 @@ def _render_convergence(graph: Graph, theme: dict[str, Any]) -> list[str]:
             else:
                 end_xs.append(sx)  # 垂直段终点是 sx，水平线从 sx 连到 dst.cx
 
-        # 避让检测：检查汇合水平段是否穿过非 src/dst 的节点
+        # 避让检测：检查汇合水平段是否穿过非 dst 的节点
         left_x = min(end_xs)
         right_x = max(end_xs)
         src_ids = {s.id for s in srcs}
@@ -229,7 +312,7 @@ def _render_convergence(graph: Graph, theme: dict[str, Any]) -> list[str]:
             mid_y = _find_avoidance_y(
                 left_x, right_x, mid_y,
                 list(graph.nodes.values()),
-                exclude_ids=src_ids | {nid},
+                exclude_ids={nid},
                 lower_bound=max_src_bottom,
                 upper_bound=dst_top,
             )
@@ -244,7 +327,32 @@ def _render_convergence(graph: Graph, theme: dict[str, Any]) -> list[str]:
                 ex = s.cx
             else:
                 ex = dst.cx
-            if abs(sx - ex) < 1:
+            # 穿透检测：垂直段 (sx, sy)→(sx, mid_y) 是否穿过中间节点
+            # 排除当前 src 自身和 dst，但包含其他 src 节点
+            vert_candidates = [n for n in graph.nodes.values()
+                               if n.id != s.id and n.id != nid]
+            vert_hit = any(
+                _vertical_segment_intersects_node(sx, sy, mid_y, n)
+                for n in vert_candidates
+            )
+            if vert_hit:
+                # 改用侧面绕行
+                go_right = sx <= dst.cx
+                side_x = _side_route_x(graph, go_right)
+                # 为水平段找安全的 y 坐标（从 sy 向下找）
+                safe_y_start = _find_side_route_safe_y(
+                    sx, side_x, sy,
+                    list(graph.nodes.values()),
+                    exclude_ids={s.id, nid},
+                    direction=1,
+                    upper_limit=mid_y,
+                )
+                if abs(safe_y_start - sy) >= 1:
+                    parts.append(f'  <line class="edge" x1="{sx}" y1="{sy}" x2="{sx}" y2="{safe_y_start}"/>')
+                parts.append(f'  <line class="edge" x1="{sx}" y1="{safe_y_start}" x2="{side_x}" y2="{safe_y_start}"/>')
+                parts.append(f'  <line class="edge" x1="{side_x}" y1="{safe_y_start}" x2="{side_x}" y2="{mid_y}"/>')
+                parts.append(f'  <line class="edge" x1="{side_x}" y1="{mid_y}" x2="{sx}" y2="{mid_y}"/>')
+            elif abs(sx - ex) < 1:
                 # 同 x：垂直线
                 parts.append(f'  <line class="edge" x1="{sx}" y1="{sy}" x2="{ex}" y2="{mid_y}"/>')
             else:
@@ -254,7 +362,32 @@ def _render_convergence(graph: Graph, theme: dict[str, Any]) -> list[str]:
         if abs(left_x - right_x) >= 1:
             parts.append(f'  <line class="edge" x1="{left_x}" y1="{mid_y}" x2="{right_x}" y2="{mid_y}"/>')
         # 汇合点 → dst 顶部（垂直，带箭头）
-        parts.append(f'  <line class="edge" x1="{dst.cx}" y1="{mid_y}" x2="{dst.cx}" y2="{dst_top}" marker-end="url(#arrow)"/>')
+        # 穿透检测：最后一段垂直段 (dst.cx, mid_y)→(dst.cx, dst_top)
+        final_candidates = [n for n in graph.nodes.values()
+                            if n.id != nid]
+        vert_final_hit = any(
+            _vertical_segment_intersects_node(dst.cx, mid_y, dst_top, n)
+            for n in final_candidates
+        )
+        if vert_final_hit:
+            # 侧面绕行
+            go_right = dst.cx >= (min(end_xs) + max(end_xs)) / 2
+            side_x = _side_route_x(graph, go_right)
+            # 为水平段找安全的 y 坐标
+            safe_y_end = _find_side_route_safe_y(
+                dst.cx, side_x, dst_top,
+                list(graph.nodes.values()),
+                exclude_ids={nid},
+                direction=-1,
+            )
+            if abs(safe_y_end - mid_y) >= 1:
+                parts.append(f'  <line class="edge" x1="{dst.cx}" y1="{mid_y}" x2="{dst.cx}" y2="{safe_y_end}"/>')
+            else:
+                parts.append(f'  <line class="edge" x1="{dst.cx}" y1="{mid_y}" x2="{side_x}" y2="{mid_y}"/>')
+            parts.append(f'  <line class="edge" x1="{side_x}" y1="{safe_y_end}" x2="{side_x}" y2="{dst_top}"/>')
+            parts.append(f'  <line class="edge" x1="{side_x}" y1="{dst_top}" x2="{dst.cx}" y2="{dst_top}" marker-end="url(#arrow)"/>')
+        else:
+            parts.append(f'  <line class="edge" x1="{dst.cx}" y1="{mid_y}" x2="{dst.cx}" y2="{dst_top}" marker-end="url(#arrow)"/>')
     return parts
 
 
